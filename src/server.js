@@ -34,8 +34,6 @@ const isProduction =
 // TRUST PROXY
 // =====================================================
 
-// Useful when deployed behind a reverse proxy such as
-// Render, Railway, Nginx, etc.
 if (isProduction) {
   app.set("trust proxy", 1);
 }
@@ -45,11 +43,6 @@ if (isProduction) {
 // SECURITY HEADERS
 // =====================================================
 
-// Helmet adds a collection of security-related
-// HTTP response headers.
-//
-// HSTS is disabled during local development because
-// forcing HTTPS on localhost is undesirable.
 app.use(
   helmet({
     strictTransportSecurity: isProduction,
@@ -65,26 +58,57 @@ app.use(
 // CORS
 // =====================================================
 
+// Normalize origins so values such as
+// https://example.com/
+// and
+// https://example.com
+// are treated as the same origin.
+
+function normalizeOrigin(origin) {
+  return origin
+    ?.trim()
+    .replace(/\/+$/, "");
+}
+
+// Read comma-separated frontend origins.
 const allowedOrigins = (
   process.env.FRONTEND_URL ||
   "http://localhost:5173"
 )
   .split(",")
-  .map((origin) => origin.trim())
+  .map(normalizeOrigin)
   .filter(Boolean);
+
+// Helpful server-side logging.
+console.log(
+  "Allowed CORS origins:",
+  allowedOrigins
+);
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests such as Postman/curl that may
-      // not include an Origin header.
+      // Allow requests without an Origin header,
+      // such as Postman, curl and some server tools.
       if (!origin) {
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      const normalizedOrigin =
+        normalizeOrigin(origin);
+
+      if (
+        allowedOrigins.includes(
+          normalizedOrigin
+        )
+      ) {
         return callback(null, true);
       }
+
+      console.error(
+        "Blocked CORS origin:",
+        origin
+      );
 
       return callback(
         new Error(
@@ -92,6 +116,7 @@ app.use(
         )
       );
     },
+
     methods: [
       "GET",
       "POST",
@@ -100,10 +125,13 @@ app.use(
       "PATCH",
       "OPTIONS",
     ],
+
     allowedHeaders: [
       "Content-Type",
       "Authorization",
     ],
+
+    optionsSuccessStatus: 204,
   })
 );
 
@@ -123,14 +151,12 @@ app.use(
 // GENERAL API RATE LIMIT
 // =====================================================
 
-// Protect the API against excessive repeated
-// requests while keeping normal application use
-// comfortable.
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: "draft-8",
   legacyHeaders: false,
+
   message: {
     success: false,
     message:
@@ -145,13 +171,12 @@ app.use("/api", apiLimiter);
 // AUTHENTICATION RATE LIMIT
 // =====================================================
 
-// Stricter limit for authentication-related
-// endpoints to reduce brute-force and abuse attempts.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
   standardHeaders: "draft-8",
   legacyHeaders: false,
+
   message: {
     success: false,
     message:
@@ -272,7 +297,6 @@ app.use(
       error.message
     );
 
-    // CORS errors
     if (
       error.message ===
       "Origin is not allowed by CORS."
