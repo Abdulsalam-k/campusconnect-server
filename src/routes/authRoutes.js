@@ -3,8 +3,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 
 const User = require("../models/User");
 const protect = require("../middleware/authMiddleware");
@@ -13,22 +11,9 @@ const {
   sendPasswordResetEmail,
 } = require("../utils/sendEmail");
 
+const cloudinary = require("../utils/cloudinary");
+
 const router = express.Router();
-
-
-// =====================================================
-// PROFILE IMAGE UPLOAD CONFIGURATION
-// =====================================================
-
-const profileUploadDirectory = path.resolve(
-  __dirname,
-  "../uploads/profiles"
-);
-
-// Make sure the upload directory exists.
-fs.mkdirSync(profileUploadDirectory, {
-  recursive: true,
-});
 
 
 // =====================================================
@@ -63,204 +48,339 @@ const uploadProfileImage = multer({
 
 
 // =====================================================
+// CLOUDINARY HELPERS
+// =====================================================
+
+function uploadImageToCloudinary(fileBuffer) {
+  return new Promise((resolve, reject) => {
+    const uploadStream =
+      cloudinary.uploader.upload_stream(
+        {
+          folder: "campusconnect/profiles",
+          resource_type: "image",
+        },
+        (error, result) => {
+          if (error) {
+            return reject(error);
+          }
+
+          resolve(result);
+        }
+      );
+
+    uploadStream.end(fileBuffer);
+  });
+}
+
+
+function getCloudinaryPublicId(imageUrl) {
+  try {
+    const url = new URL(imageUrl);
+
+    const uploadMarker =
+      "/image/upload/";
+
+    const uploadIndex =
+      url.pathname.indexOf(uploadMarker);
+
+    if (uploadIndex === -1) {
+      return null;
+    }
+
+    let publicId =
+      url.pathname.substring(
+        uploadIndex + uploadMarker.length
+      );
+
+    // Remove transformation segments such as:
+    // c_fill,w_500,h_500
+    const pathParts =
+      publicId.split("/");
+
+    const versionIndex =
+      pathParts.findIndex((part) =>
+        /^v\d+$/.test(part)
+      );
+
+    if (versionIndex !== -1) {
+      publicId =
+        pathParts
+          .slice(versionIndex + 1)
+          .join("/");
+    }
+
+    // Remove file extension.
+    publicId =
+      publicId.replace(
+        /\.(jpg|jpeg|png|webp|gif)$/i,
+        ""
+      );
+
+    return publicId || null;
+  } catch (error) {
+    return null;
+  }
+}
+
+
+async function deleteCloudinaryImage(imageUrl) {
+  if (
+    !imageUrl ||
+    !imageUrl.includes(
+      "res.cloudinary.com"
+    )
+  ) {
+    return;
+  }
+
+  const publicId =
+    getCloudinaryPublicId(
+      imageUrl
+    );
+
+  if (!publicId) {
+    return;
+  }
+
+  try {
+    await cloudinary.uploader.destroy(
+      publicId,
+      {
+        resource_type: "image",
+        invalidate: true,
+      }
+    );
+  } catch (error) {
+    console.error(
+      "Cloudinary image deletion failed:",
+      error.message
+    );
+  }
+}
+
+
+// =====================================================
 // REGISTER
 // =====================================================
 
-router.post("/register", async (req, res) => {
-  try {
-    const {
-      name,
-      email,
-      password,
-    } = req.body || {};
+router.post(
+  "/register",
+  async (req, res) => {
+    try {
+      const {
+        name,
+        email,
+        password,
+      } = req.body || {};
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
+      if (
+        !name ||
+        !email ||
+        !password
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Name, email and password are required.",
+        });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Password must be at least 6 characters.",
+        });
+      }
+
+      const normalizedEmail =
+        email.toLowerCase().trim();
+
+      const existingUser =
+        await User.findOne({
+          email: normalizedEmail,
+        });
+
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "A user with this email already exists.",
+        });
+      }
+
+      const hashedPassword =
+        await bcrypt.hash(
+          password,
+          10
+        );
+
+      const user =
+        await User.create({
+          name: name.trim(),
+          email: normalizedEmail,
+          password: hashedPassword,
+        });
+
+      const userResponse = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        skills: user.skills,
+        education: user.education,
+        department: user.department,
+        location: user.location,
+        bio: user.bio,
+        profileImage:
+          user.profileImage,
+        createdAt:
+          user.createdAt,
+      };
+
+      return res.status(201).json({
+        success: true,
+        message:
+          "Account created successfully.",
+        data: userResponse,
+      });
+    } catch (error) {
+      console.error(
+        "Registration error:",
+        error.message
+      );
+
+      return res.status(500).json({
         success: false,
         message:
-          "Name, email and password are required.",
+          "Failed to create account.",
       });
     }
-
-    if (password.length < 6) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Password must be at least 6 characters.",
-      });
-    }
-
-    const normalizedEmail =
-      email.toLowerCase().trim();
-
-    const existingUser =
-      await User.findOne({
-        email: normalizedEmail,
-      });
-
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message:
-          "A user with this email already exists.",
-      });
-    }
-
-    const hashedPassword =
-      await bcrypt.hash(password, 10);
-
-    const user =
-      await User.create({
-        name: name.trim(),
-        email: normalizedEmail,
-        password: hashedPassword,
-      });
-
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      isActive: user.isActive,
-      skills: user.skills,
-      education: user.education,
-      department: user.department,
-      location: user.location,
-      bio: user.bio,
-      profileImage: user.profileImage,
-      createdAt: user.createdAt,
-    };
-
-    return res.status(201).json({
-      success: true,
-      message:
-        "Account created successfully.",
-      data: userResponse,
-    });
-  } catch (error) {
-    console.error(
-      "Registration error:",
-      error.message
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Failed to create account.",
-    });
   }
-});
+);
 
 
 // =====================================================
 // LOGIN
 // =====================================================
 
-router.post("/login", async (req, res) => {
-  try {
-    const {
-      email,
-      password,
-    } = req.body || {};
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Email and password are required.",
-      });
-    }
-
-    const user =
-      await User.findOne({
-        email:
-          email.toLowerCase().trim(),
-      });
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Invalid email or password.",
-      });
-    }
-
-    if (user.isActive === false) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Your account has been deactivated. Please contact an administrator.",
-      });
-    }
-
-    const passwordMatch =
-      await bcrypt.compare(
+router.post(
+  "/login",
+  async (req, res) => {
+    try {
+      const {
+        email,
         password,
-        user.password
+      } = req.body || {};
+
+      if (
+        !email ||
+        !password
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Email and password are required.",
+        });
+      }
+
+      const user =
+        await User.findOne({
+          email:
+            email
+              .toLowerCase()
+              .trim(),
+        });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Invalid email or password.",
+        });
+      }
+
+      if (
+        user.isActive === false
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Your account has been deactivated. Please contact an administrator.",
+        });
+      }
+
+      const passwordMatch =
+        await bcrypt.compare(
+          password,
+          user.password
+        );
+
+      if (!passwordMatch) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Invalid email or password.",
+        });
+      }
+
+      if (!process.env.JWT_SECRET) {
+        return res.status(500).json({
+          success: false,
+          message:
+            "JWT secret is not configured.",
+        });
+      }
+
+      const token =
+        jwt.sign(
+          {
+            userId: user._id,
+            role: user.role,
+          },
+          process.env.JWT_SECRET,
+          {
+            expiresIn: "7d",
+          }
+        );
+
+      const userResponse = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+        skills: user.skills,
+        education: user.education,
+        department: user.department,
+        location: user.location,
+        bio: user.bio,
+        profileImage:
+          user.profileImage,
+      };
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Login successful.",
+        token,
+        data: userResponse,
+      });
+    } catch (error) {
+      console.error(
+        "Login error:",
+        error.message
       );
 
-    if (!passwordMatch) {
-      return res.status(401).json({
-        success: false,
-        message:
-          "Invalid email or password.",
-      });
-    }
-
-    if (!process.env.JWT_SECRET) {
       return res.status(500).json({
         success: false,
         message:
-          "JWT secret is not configured.",
+          "Failed to login.",
       });
     }
-
-    const token =
-      jwt.sign(
-        {
-          userId: user._id,
-          role: user.role,
-        },
-        process.env.JWT_SECRET,
-        {
-          expiresIn: "7d",
-        }
-      );
-
-    const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      isActive: user.isActive,
-      skills: user.skills,
-      education: user.education,
-      department: user.department,
-      location: user.location,
-      bio: user.bio,
-      profileImage: user.profileImage,
-    };
-
-    return res.status(200).json({
-      success: true,
-      message:
-        "Login successful.",
-      token,
-      data: userResponse,
-    });
-  } catch (error) {
-    console.error(
-      "Login error:",
-      error.message
-    );
-
-    return res.status(500).json({
-      success: false,
-      message:
-        "Failed to login.",
-    });
   }
-});
+);
 
 
 // =====================================================
@@ -418,7 +538,9 @@ router.post(
         });
       }
 
-      if (password.length < 6) {
+      if (
+        password.length < 6
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -552,9 +674,7 @@ router.put(
     "profileImage"
   ),
   async (req, res) => {
-    // Declared outside try so the catch
-    // block can clean up a newly created file.
-    let newImagePath = null;
+    let newCloudinaryImage = null;
 
     try {
       const {
@@ -570,7 +690,10 @@ router.put(
       // VALIDATE NAME
       // ==========================================
 
-      if (!name || !name.trim()) {
+      if (
+        !name ||
+        !name.trim()
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -645,46 +768,29 @@ router.put(
 
 
       // ==========================================
-      // SAVE NEW PROFILE IMAGE
+      // UPLOAD NEW PROFILE IMAGE
       // ==========================================
 
       if (req.file) {
-        fs.mkdirSync(
-          profileUploadDirectory,
-          {
-            recursive: true,
-          }
-        );
-
-        const extension =
-          path
-            .extname(
-              req.file.originalname
-            )
-            .toLowerCase();
-
-        const fileName =
-          `profile-${Date.now()}-${crypto
-            .randomBytes(8)
-            .toString("hex")}${extension}`;
-
-        newImagePath =
-          path.join(
-            profileUploadDirectory,
-            fileName
+        const uploadResult =
+          await uploadImageToCloudinary(
+            req.file.buffer
           );
 
-        // Write image buffer.
-        await fs.promises.writeFile(
-          newImagePath,
-          req.file.buffer
-        );
+        if (
+          !uploadResult ||
+          !uploadResult.secure_url
+        ) {
+          throw new Error(
+            "Cloudinary image upload failed."
+          );
+        }
 
-        // Save public image URL in MongoDB.
+        newCloudinaryImage =
+          uploadResult;
+
         user.profileImage =
-          `${req.protocol}://${req.get(
-            "host"
-          )}/uploads/profiles/${fileName}`;
+          uploadResult.secure_url;
       }
 
 
@@ -696,45 +802,20 @@ router.put(
 
 
       // ==========================================
-      // DELETE OLD IMAGE AFTER SUCCESSFUL SAVE
+      // DELETE OLD CLOUDINARY IMAGE
+      // AFTER SUCCESSFUL SAVE
       // ==========================================
 
       if (
         req.file &&
         oldProfileImage &&
         oldProfileImage.includes(
-          "/uploads/profiles/"
+          "res.cloudinary.com"
         )
       ) {
-        try {
-          const oldFileName =
-            path.basename(
-              oldProfileImage
-            );
-
-          const oldFilePath =
-            path.join(
-              profileUploadDirectory,
-              oldFileName
-            );
-
-          // Don't accidentally delete
-          // the newly uploaded image.
-          if (
-            newImagePath &&
-            oldFilePath !== newImagePath &&
-            fs.existsSync(oldFilePath)
-          ) {
-            await fs.promises.unlink(
-              oldFilePath
-            );
-          }
-        } catch (deleteError) {
-          console.error(
-            "Previous profile image cleanup failed:",
-            deleteError.message
-          );
-        }
+        await deleteCloudinaryImage(
+          oldProfileImage
+        );
       }
 
 
@@ -775,22 +856,26 @@ router.put(
         error.message
       );
 
-      // Remove the newly written image
-      // if MongoDB saving failed.
-      if (newImagePath) {
+      // ==========================================
+      // CLEAN UP NEW CLOUDINARY IMAGE
+      // IF DATABASE SAVE FAILED
+      // ==========================================
+
+      if (
+        newCloudinaryImage &&
+        newCloudinaryImage.public_id
+      ) {
         try {
-          if (
-            fs.existsSync(
-              newImagePath
-            )
-          ) {
-            await fs.promises.unlink(
-              newImagePath
-            );
-          }
+          await cloudinary.uploader.destroy(
+            newCloudinaryImage.public_id,
+            {
+              resource_type: "image",
+              invalidate: true,
+            }
+          );
         } catch (cleanupError) {
           console.error(
-            "Failed to remove new profile image:",
+            "Failed to remove new Cloudinary image:",
             cleanupError.message
           );
         }
@@ -850,41 +935,17 @@ router.delete(
 
 
       // ==========================================
-      // DELETE PHYSICAL IMAGE FILE
+      // DELETE CLOUDINARY IMAGE
       // ==========================================
 
       if (
         currentProfileImage.includes(
-          "/uploads/profiles/"
+          "res.cloudinary.com"
         )
       ) {
-        try {
-          const fileName =
-            path.basename(
-              currentProfileImage
-            );
-
-          const filePath =
-            path.join(
-              profileUploadDirectory,
-              fileName
-            );
-
-          if (
-            fs.existsSync(
-              filePath
-            )
-          ) {
-            await fs.promises.unlink(
-              filePath
-            );
-          }
-        } catch (deleteError) {
-          console.error(
-            "Profile image file deletion failed:",
-            deleteError.message
-          );
-        }
+        await deleteCloudinaryImage(
+          currentProfileImage
+        );
       }
 
 
