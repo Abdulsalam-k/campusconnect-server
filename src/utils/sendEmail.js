@@ -1,11 +1,18 @@
-const RESEND_API_URL = "https://api.resend.com/emails";
-
-const DEFAULT_FROM =
-  process.env.RESEND_FROM_EMAIL ||
-  "onboarding@resend.dev";
+const BREVO_API_URL =
+  "https://api.brevo.com/v3/smtp/email";
 
 /**
- * Send an email through Resend.
+ * Brevo sender configuration.
+ */
+const DEFAULT_FROM_EMAIL =
+  process.env.BREVO_FROM_EMAIL;
+
+const DEFAULT_FROM_NAME =
+  process.env.BREVO_FROM_NAME ||
+  "CampusConnect";
+
+/**
+ * Send an email through Brevo's HTTPS API.
  */
 async function sendEmail({
   to,
@@ -19,50 +26,88 @@ async function sendEmail({
     );
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey =
+    process.env.BREVO_API_KEY;
 
   if (!apiKey) {
     throw new Error(
-      "RESEND_API_KEY is not configured."
+      "BREVO_API_KEY is not configured."
+    );
+  }
+
+  if (!DEFAULT_FROM_EMAIL) {
+    throw new Error(
+      "BREVO_FROM_EMAIL is not configured."
     );
   }
 
   const recipients = Array.isArray(to)
-    ? to
-    : [to];
+    ? to.map((recipient) => {
+        if (
+          typeof recipient === "string"
+        ) {
+          return {
+            email: recipient,
+          };
+        }
+
+        return {
+          email: recipient.email,
+          name: recipient.name,
+        };
+      })
+    : [
+        typeof to === "string"
+          ? { email: to }
+          : {
+              email: to.email,
+              name: to.name,
+            },
+      ];
 
   const payload = {
-    from: DEFAULT_FROM,
+    sender: {
+      name: DEFAULT_FROM_NAME,
+      email: DEFAULT_FROM_EMAIL,
+    },
+
     to: recipients,
+
     subject,
   };
 
-  if (text) {
-    payload.text = text;
+  if (html) {
+    payload.htmlContent = html;
   }
 
-  if (html) {
-    payload.html = html;
+  if (text) {
+    payload.textContent = text;
   }
 
   let response;
 
   try {
-    response = await fetch(RESEND_API_URL, {
-      method: "POST",
+    response = await fetch(
+      BREVO_API_URL,
+      {
+        method: "POST",
 
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
+        headers: {
+          accept: "application/json",
+          "api-key": apiKey,
+          "content-type":
+            "application/json",
+        },
 
-      body: JSON.stringify(payload),
+        body: JSON.stringify(payload),
 
-      signal: AbortSignal.timeout(15000),
-    });
+        signal:
+          AbortSignal.timeout(15000),
+      }
+    );
   } catch (error) {
     console.error(
-      "Resend connection failed:",
+      "Brevo connection failed:",
       error.message
     );
 
@@ -81,21 +126,24 @@ async function sendEmail({
 
   if (!response.ok) {
     console.error(
-      "Resend email failed:",
+      "Brevo email failed:",
       data || response.statusText
     );
 
-    const resendMessage =
+    const brevoMessage =
       data?.message ||
-      data?.error?.message ||
-      `Resend API request failed with status ${response.status}.`;
+      data?.code ||
+      `Brevo API request failed with status ${response.status}.`;
 
-    throw new Error(resendMessage);
+    throw new Error(
+      brevoMessage
+    );
   }
 
   console.log(
-    "Email sent successfully through Resend:",
-    data?.id || "no message ID returned"
+    "Email sent successfully through Brevo:",
+    data?.messageId ||
+      "message accepted"
   );
 
   return data;
@@ -109,12 +157,20 @@ async function sendPasswordResetEmail({
   name,
   resetLink,
 }) {
-  const safeName = String(name || "there")
+  const safeName = String(
+    name || "there"
+  )
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
 
   const text = `
 Hello ${name || "there"},
@@ -181,7 +237,9 @@ CampusConnect
             font-weight: 800;
           "
         >
-          Campus<span style="color: #60a5fa;">Connect</span>
+          Campus<span
+            style="color: #60a5fa;"
+          >Connect</span>
         </div>
 
         <p
@@ -191,11 +249,16 @@ CampusConnect
             font-size: 13px;
           "
         >
-          Student opportunities. Talent. Connections.
+          Student opportunities. Talent.
+          Connections.
         </p>
       </div>
 
-      <div style="padding: 35px 30px;">
+      <div
+        style="
+          padding: 35px 30px;
+        "
+      >
         <h1
           style="
             margin: 0 0 14px;
@@ -225,8 +288,10 @@ CampusConnect
             line-height: 1.7;
           "
         >
-          We received a request to reset your CampusConnect
-          password. Click the button below to create a new password.
+          We received a request to reset
+          your CampusConnect password.
+          Click the button below to create
+          a new password.
         </p>
 
         <div
@@ -236,8 +301,7 @@ CampusConnect
           "
         >
           <a
-            ses:no-track
-             href="${resetLink}"
+            href="${resetLink}"
             style="
               display: inline-block;
               padding: 14px 24px;
@@ -261,7 +325,8 @@ CampusConnect
             line-height: 1.6;
           "
         >
-          This reset link expires in <strong>15 minutes</strong>
+          This reset link expires in
+          <strong>15 minutes</strong>
           and can only be used once.
         </p>
 
@@ -273,8 +338,9 @@ CampusConnect
             line-height: 1.6;
           "
         >
-          If you did not request a password reset, you can safely
-          ignore this email.
+          If you did not request a password
+          reset, you can safely ignore this
+          email.
         </p>
 
         <div
@@ -291,8 +357,9 @@ CampusConnect
               font-size: 12px;
             "
           >
-            CampusConnect — Empowering students to discover
-            opportunities and connect with talent.
+            CampusConnect — Empowering
+            students to discover opportunities
+            and connect with talent.
           </p>
         </div>
       </div>
@@ -304,7 +371,8 @@ CampusConnect
 
   return sendEmail({
     to,
-    subject: "Reset your CampusConnect password",
+    subject:
+      "Reset your CampusConnect password",
     text,
     html,
   });
