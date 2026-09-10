@@ -236,7 +236,8 @@ CampusConnect
           "
         >
           <a
-            href="${resetLink}"
+            ses:no-track
+             href="${resetLink}"
             style="
               display: inline-block;
               padding: 14px 24px;
