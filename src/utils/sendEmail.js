@@ -1,31 +1,11 @@
-const nodemailer = require("nodemailer");
+const RESEND_API_URL = "https://api.resend.com/emails";
 
-const isProduction = process.env.NODE_ENV === "production";
-
-const transporterConfig = {
-  service: process.env.SMTP_SERVICE || "Gmail",
-
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-};
-
-// Your local machine previously reported:
-// "self-signed certificate in certificate chain"
-//
-// Keep the workaround ONLY for local development.
-// It must not be used in production.
-if (!isProduction) {
-  transporterConfig.tls = {
-    rejectUnauthorized: false,
-  };
-}
-
-const transporter = nodemailer.createTransport(transporterConfig);
+const DEFAULT_FROM =
+  process.env.RESEND_FROM_EMAIL ||
+  "onboarding@resend.dev";
 
 /**
- * Send an email.
+ * Send an email through Resend.
  */
 async function sendEmail({
   to,
@@ -34,19 +14,91 @@ async function sendEmail({
   html,
 }) {
   if (!to || !subject) {
-    throw new Error("Email recipient and subject are required.");
+    throw new Error(
+      "Email recipient and subject are required."
+    );
   }
 
-  return transporter.sendMail({
-    from:
-      process.env.MAIL_FROM ||
-      `CampusConnect <${process.env.SMTP_USER}>`,
+  const apiKey = process.env.RESEND_API_KEY;
 
-    to,
+  if (!apiKey) {
+    throw new Error(
+      "RESEND_API_KEY is not configured."
+    );
+  }
+
+  const recipients = Array.isArray(to)
+    ? to
+    : [to];
+
+  const payload = {
+    from: DEFAULT_FROM,
+    to: recipients,
     subject,
-    text,
-    html,
-  });
+  };
+
+  if (text) {
+    payload.text = text;
+  }
+
+  if (html) {
+    payload.html = html;
+  }
+
+  let response;
+
+  try {
+    response = await fetch(RESEND_API_URL, {
+      method: "POST",
+
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+
+      body: JSON.stringify(payload),
+
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (error) {
+    console.error(
+      "Resend connection failed:",
+      error.message
+    );
+
+    throw new Error(
+      "Email service connection failed."
+    );
+  }
+
+  let data = null;
+
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+
+  if (!response.ok) {
+    console.error(
+      "Resend email failed:",
+      data || response.statusText
+    );
+
+    const resendMessage =
+      data?.message ||
+      data?.error?.message ||
+      `Resend API request failed with status ${response.status}.`;
+
+    throw new Error(resendMessage);
+  }
+
+  console.log(
+    "Email sent successfully through Resend:",
+    data?.id || "no message ID returned"
+  );
+
+  return data;
 }
 
 /**
