@@ -447,13 +447,13 @@ router.post(
         resetExpires;
 
       await user.save();
-
       const frontendUrl =
-        process.env.FRONTEND_URL ||
-        "http://localhost:5173";
+             process.env.FRONTEND_APP_URL ||
+            "http://localhost:5173";
 
-      const resetLink =
-        `${frontendUrl}/reset-password/${resetToken}`;
+        const resetLink =
+          `${frontendUrl.replace(/\/+$/, "")}/reset-password/${resetToken}`;
+
 
       try {
         await sendPasswordResetEmail({
