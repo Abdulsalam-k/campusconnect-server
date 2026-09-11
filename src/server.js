@@ -2,7 +2,6 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const path = require("path");
 
 require("dotenv").config();
 
@@ -21,14 +20,12 @@ const app = express();
 
 const PORT = process.env.PORT || 5000;
 
-
 // =====================================================
 // ENVIRONMENT
 // =====================================================
 
 const isProduction =
   process.env.NODE_ENV === "production";
-
 
 // =====================================================
 // TRUST PROXY
@@ -38,7 +35,6 @@ if (isProduction) {
   app.set("trust proxy", 1);
 }
 
-
 // =====================================================
 // SECURITY HEADERS
 // =====================================================
@@ -46,23 +42,15 @@ if (isProduction) {
 app.use(
   helmet({
     strictTransportSecurity: isProduction,
-
     crossOriginResourcePolicy: {
       policy: "cross-origin",
     },
   })
 );
 
-
 // =====================================================
 // CORS
 // =====================================================
-
-// Normalize origins so values such as
-// https://example.com/
-// and
-// https://example.com
-// are treated as the same origin.
 
 function normalizeOrigin(origin) {
   return origin
@@ -70,7 +58,6 @@ function normalizeOrigin(origin) {
     .replace(/\/+$/, "");
 }
 
-// Read comma-separated frontend origins.
 const allowedOrigins = (
   process.env.FRONTEND_URL ||
   "http://localhost:5173"
@@ -79,7 +66,6 @@ const allowedOrigins = (
   .map(normalizeOrigin)
   .filter(Boolean);
 
-// Helpful server-side logging.
 console.log(
   "Allowed CORS origins:",
   allowedOrigins
@@ -88,8 +74,6 @@ console.log(
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests without an Origin header,
-      // such as Postman, curl and some server tools.
       if (!origin) {
         return callback(null, true);
       }
@@ -135,7 +119,6 @@ app.use(
   })
 );
 
-
 // =====================================================
 // BODY PARSER
 // =====================================================
@@ -145,7 +128,6 @@ app.use(
     limit: "100kb",
   })
 );
-
 
 // =====================================================
 // GENERAL API RATE LIMIT
@@ -166,7 +148,6 @@ const apiLimiter = rateLimit({
 
 app.use("/api", apiLimiter);
 
-
 // =====================================================
 // AUTHENTICATION RATE LIMIT
 // =====================================================
@@ -184,6 +165,28 @@ const authLimiter = rateLimit({
   },
 });
 
+// =====================================================
+// REGISTRATION RATE LIMIT
+// =====================================================
+
+const registrationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+
+  message: {
+    success: false,
+    message:
+      "Too many registration attempts. Please try again later.",
+  },
+});
+
+app.use(
+  "/api/auth/register",
+  registrationLimiter
+);
+
 app.use(
   "/api/auth/login",
   authLimiter
@@ -199,20 +202,6 @@ app.use(
   authLimiter
 );
 
-
-// =====================================================
-// STATIC FILES
-// PROFILE IMAGES
-// =====================================================
-
-app.use(
-  "/uploads",
-  express.static(
-    path.join(__dirname, "uploads")
-  )
-);
-
-
 // =====================================================
 // HEALTH CHECK
 // =====================================================
@@ -224,7 +213,6 @@ app.get("/api/health", (req, res) => {
       "CampusConnect API is running 🚀",
   });
 });
-
 
 // =====================================================
 // API ROUTES
@@ -270,7 +258,6 @@ app.use(
   adminRoutes
 );
 
-
 // =====================================================
 // 404 API HANDLER
 // =====================================================
@@ -280,11 +267,11 @@ app.use(
   (req, res) => {
     return res.status(404).json({
       success: false,
-      message: "API endpoint not found.",
+      message:
+        "API endpoint not found.",
     });
   }
 );
-
 
 // =====================================================
 // GLOBAL ERROR HANDLER
@@ -316,13 +303,11 @@ app.use(
   }
 );
 
-
 // =====================================================
 // CONNECT DATABASE
 // =====================================================
 
 connectDB();
-
 
 // =====================================================
 // START SERVER
