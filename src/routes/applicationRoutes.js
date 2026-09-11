@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 
 const Application = require("../models/Application");
 const Opportunity = require("../models/Opportunity");
@@ -14,6 +15,30 @@ const {
 
 const router = express.Router();
 
+// =====================================================
+// INPUT HELPERS
+// =====================================================
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    email
+  );
+}
+
+function isValidPhone(phone) {
+  return /^[0-9+\-()\s]{7,20}$/.test(
+    phone
+  );
+}
 
 // =====================================================
 // SUBMIT APPLICATION
@@ -34,7 +59,10 @@ router.post(
         coverLetter,
       } = req.body || {};
 
-      // VALIDATE REQUIRED FIELDS
+      // ==========================================
+      // REQUIRED FIELD VALIDATION
+      // ==========================================
+
       if (
         !opportunityId ||
         !fullName ||
@@ -49,9 +77,97 @@ router.post(
         });
       }
 
+      // ==========================================
+      // OPPORTUNITY ID VALIDATION
+      // ==========================================
+
+      if (
+        !mongoose.isValidObjectId(
+          opportunityId
+        )
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid opportunity ID.",
+        });
+      }
+
+      // ==========================================
+      // NORMALIZE INPUT
+      // ==========================================
+
+      const normalizedName =
+        String(fullName).trim();
+
+      const normalizedEmail =
+        String(email)
+          .toLowerCase()
+          .trim();
+
+      const normalizedPhone =
+        String(phone).trim();
+
+      const normalizedCoverLetter =
+        String(coverLetter).trim();
+
+      // ==========================================
+      // LENGTH VALIDATION
+      // ==========================================
+
+      if (
+        normalizedName.length < 2 ||
+        normalizedName.length > 100
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Full name must be between 2 and 100 characters.",
+        });
+      }
+
+      if (
+        normalizedEmail.length > 254 ||
+        !isValidEmail(normalizedEmail)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please provide a valid email address.",
+        });
+      }
+
+      if (
+        normalizedPhone.length < 7 ||
+        normalizedPhone.length > 20 ||
+        !isValidPhone(normalizedPhone)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please provide a valid phone number.",
+        });
+      }
+
+      if (
+        normalizedCoverLetter.length < 10 ||
+        normalizedCoverLetter.length > 5000
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Cover letter must be between 10 and 5000 characters.",
+        });
+      }
+
+      // ==========================================
       // CHECK OPPORTUNITY
+      // ==========================================
+
       const opportunity =
-        await Opportunity.findById(opportunityId);
+        await Opportunity.findById(
+          opportunityId
+        );
 
       if (!opportunity) {
         return res.status(404).json({
@@ -60,20 +176,15 @@ router.post(
         });
       }
 
-      // ONLY STUDENTS CAN APPLY
-      if (req.user.role !== "student") {
-        return res.status(403).json({
-          success: false,
-          message:
-            "Only students can submit applications.",
-        });
-      }
-
+      // ==========================================
       // PREVENT DUPLICATE APPLICATION
+      // ==========================================
+
       const existingApplication =
         await Application.findOne({
           userId: req.user.userId,
-          opportunityId: opportunity._id,
+          opportunityId:
+            opportunity._id,
         });
 
       if (existingApplication) {
@@ -84,15 +195,20 @@ router.post(
         });
       }
 
+      // ==========================================
       // CREATE APPLICATION
+      // ==========================================
+
       const application =
         await Application.create({
           userId: req.user.userId,
-          opportunityId: opportunity._id,
-          fullName: fullName.trim(),
-          email: email.toLowerCase().trim(),
-          phone: phone.trim(),
-          coverLetter: coverLetter.trim(),
+          opportunityId:
+            opportunity._id,
+          fullName: normalizedName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          coverLetter:
+            normalizedCoverLetter,
         });
 
       // =================================================
@@ -114,10 +230,11 @@ router.post(
 
       if (opportunity.createdBy) {
         await Notification.create({
-          userId: opportunity.createdBy,
+          userId:
+            opportunity.createdBy,
           title: "New Application",
           message:
-            `${fullName.trim()} has applied for your ` +
+            `${normalizedName} has applied for your ` +
             `${opportunity.title} opportunity.`,
           type: "application",
         });
@@ -129,11 +246,43 @@ router.post(
 
       if (opportunity.createdBy) {
         const recruiter =
-          await User.findById(opportunity.createdBy)
-            .select("name email");
+          await User.findById(
+            opportunity.createdBy
+          ).select("name email");
 
         if (recruiter?.email) {
           try {
+            const safeRecruiterName =
+              escapeHtml(
+                recruiter.name ||
+                  "Recruiter"
+              );
+
+            const safeOpportunityTitle =
+              escapeHtml(
+                opportunity.title
+              );
+
+            const safeCompany =
+              escapeHtml(
+                opportunity.company
+              );
+
+            const safeApplicantName =
+              escapeHtml(
+                normalizedName
+              );
+
+            const safeApplicantEmail =
+              escapeHtml(
+                normalizedEmail
+              );
+
+            const safePhone =
+              escapeHtml(
+                normalizedPhone
+              );
+
             await sendEmail({
               to: recruiter.email,
 
@@ -152,13 +301,13 @@ Company:
 ${opportunity.company}
 
 Applicant:
-${fullName.trim()}
+${normalizedName}
 
 Applicant email:
-${email.toLowerCase().trim()}
+${normalizedEmail}
 
 Phone:
-${phone.trim()}
+${normalizedPhone}
 
 The applicant has successfully submitted their application.
 
@@ -202,7 +351,6 @@ CampusConnect
         border: 1px solid #e2e8f0;
       "
     >
-
       <div
         style="
           background: #0f172a;
@@ -217,14 +365,15 @@ CampusConnect
             font-weight: 800;
           "
         >
-          Campus<span style="color: #60a5fa;">
+          Campus<span
+            style="color: #60a5fa;"
+          >
             Connect
           </span>
         </div>
       </div>
 
       <div style="padding: 35px 30px;">
-
         <h1
           style="
             margin: 0 0 14px;
@@ -242,7 +391,7 @@ CampusConnect
             line-height: 1.7;
           "
         >
-          Hello ${recruiter.name || "Recruiter"},
+          Hello ${safeRecruiterName},
         </p>
 
         <p
@@ -252,8 +401,8 @@ CampusConnect
             line-height: 1.7;
           "
         >
-          A student has applied for your opportunity
-          on CampusConnect.
+          A student has applied for your
+          opportunity on CampusConnect.
         </p>
 
         <div
@@ -281,7 +430,7 @@ CampusConnect
               font-size: 17px;
             "
           >
-            ${opportunity.title}
+            ${safeOpportunityTitle}
           </strong>
 
           <p
@@ -291,7 +440,7 @@ CampusConnect
               font-size: 14px;
             "
           >
-            ${opportunity.company}
+            ${safeCompany}
           </p>
         </div>
 
@@ -321,7 +470,7 @@ CampusConnect
               font-weight: 700;
             "
           >
-            ${fullName.trim()}
+            ${safeApplicantName}
           </p>
 
           <p
@@ -331,7 +480,7 @@ CampusConnect
               font-size: 14px;
             "
           >
-            ${email.toLowerCase().trim()}
+            ${safeApplicantEmail}
           </p>
 
           <p
@@ -341,7 +490,7 @@ CampusConnect
               font-size: 14px;
             "
           >
-            ${phone.trim()}
+            ${safePhone}
           </p>
         </div>
 
@@ -352,8 +501,8 @@ CampusConnect
             line-height: 1.7;
           "
         >
-          Log in to CampusConnect to review the
-          applicant and manage the application.
+          Log in to CampusConnect to review
+          the applicant and manage the application.
         </p>
 
         <div
@@ -374,7 +523,6 @@ CampusConnect
             talent and connections.
           </p>
         </div>
-
       </div>
     </div>
   </div>
@@ -383,8 +531,8 @@ CampusConnect
 `.trim(),
             });
           } catch (emailError) {
-            // Email failure must not cancel a successful
-            // application submission.
+            // Email failure must not cancel
+            // successful application submission.
             console.error(
               "Recruiter application email failed:",
               emailError.message
@@ -394,7 +542,7 @@ CampusConnect
       }
 
       // =================================================
-      // RETURN APPLICATION WITH OPPORTUNITY
+      // RETURN APPLICATION
       // =================================================
 
       await application.populate(
@@ -402,7 +550,7 @@ CampusConnect
         "title company location type mode category deadline"
       );
 
-      res.status(201).json({
+      return res.status(201).json({
         success: true,
         message:
           "Application submitted successfully.",
@@ -414,7 +562,7 @@ CampusConnect
         error.message
       );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message:
           "Failed to submit application.",
@@ -422,7 +570,6 @@ CampusConnect
     }
   }
 );
-
 
 // =====================================================
 // UPDATE APPLICATION STATUS
@@ -435,11 +582,31 @@ router.put(
   authorizeRoles("recruiter", "admin"),
   async (req, res) => {
     try {
+      const { id } = req.params;
       const { status } = req.body || {};
 
-      // VALIDATE STATUS
+      // ==========================================
+      // VALIDATE APPLICATION ID
+      // ==========================================
+
       if (
-        !["Accepted", "Rejected"].includes(status)
+        !mongoose.isValidObjectId(id)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid application ID.",
+        });
+      }
+
+      // ==========================================
+      // VALIDATE STATUS
+      // ==========================================
+
+      if (
+        !["Accepted", "Rejected"].includes(
+          status
+        )
       ) {
         return res.status(400).json({
           success: false,
@@ -448,14 +615,16 @@ router.put(
         });
       }
 
+      // ==========================================
       // FIND APPLICATION
+      // ==========================================
+
       const application =
-        await Application.findById(
-          req.params.id
-        ).populate(
-          "opportunityId",
-          "title company createdBy"
-        );
+        await Application.findById(id)
+          .populate(
+            "opportunityId",
+            "title company createdBy"
+          );
 
       if (!application) {
         return res.status(404).json({
@@ -465,13 +634,20 @@ router.put(
         });
       }
 
+      // ==========================================
       // ADMIN CAN MANAGE ALL APPLICATIONS
+      // ==========================================
+
       const isAdmin =
         req.user.role === "admin";
 
-      // RECRUITER MUST OWN THE OPPORTUNITY
+      // ==========================================
+      // RECRUITER MUST OWN OPPORTUNITY
+      // ==========================================
+
       const isOpportunityOwner =
-        application.opportunityId?.createdBy &&
+        application.opportunityId
+          ?.createdBy &&
         application.opportunityId.createdBy
           .toString() ===
           req.user.userId.toString();
@@ -487,8 +663,14 @@ router.put(
         });
       }
 
+      // ==========================================
       // PREVENT REPROCESSING
-      if (application.status !== "Pending") {
+      // ==========================================
+
+      if (
+        application.status !==
+        "Pending"
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -496,7 +678,10 @@ router.put(
         });
       }
 
+      // ==========================================
       // UPDATE STATUS
+      // ==========================================
+
       application.status = status;
 
       await application.save();
@@ -520,14 +705,30 @@ router.put(
       // =================================================
 
       const student =
-        await User.findById(application.userId)
-          .select("name email");
+        await User.findById(
+          application.userId
+        ).select("name email");
 
       if (student?.email) {
         const isAccepted =
           status === "Accepted";
 
         try {
+          const safeStudentName =
+            escapeHtml(
+              student.name || "Student"
+            );
+
+          const safeOpportunityTitle =
+            escapeHtml(
+              application.opportunityId.title
+            );
+
+          const safeCompany =
+            escapeHtml(
+              application.opportunityId.company
+            );
+
           await sendEmail({
             to: student.email,
 
@@ -594,7 +795,6 @@ CampusConnect
         border: 1px solid #e2e8f0;
       "
     >
-
       <div
         style="
           background: #0f172a;
@@ -609,7 +809,9 @@ CampusConnect
             font-weight: 800;
           "
         >
-          Campus<span style="color: #60a5fa;">
+          Campus<span
+            style="color: #60a5fa;"
+          >
             Connect
           </span>
         </div>
@@ -634,7 +836,7 @@ CampusConnect
             line-height: 1.7;
           "
         >
-          Hello ${student.name || "Student"},
+          Hello ${safeStudentName},
         </p>
 
         <p
@@ -652,11 +854,15 @@ CampusConnect
             margin: 24px 0;
             padding: 20px;
             background: ${
-              isAccepted ? "#ecfdf5" : "#fef2f2"
+              isAccepted
+                ? "#ecfdf5"
+                : "#fef2f2"
             };
             border-radius: 12px;
             border: 1px solid ${
-              isAccepted ? "#a7f3d0" : "#fecaca"
+              isAccepted
+                ? "#a7f3d0"
+                : "#fecaca"
             };
           "
         >
@@ -678,7 +884,7 @@ CampusConnect
               font-size: 17px;
             "
           >
-            ${application.opportunityId.title}
+            ${safeOpportunityTitle}
           </strong>
 
           <p
@@ -688,7 +894,7 @@ CampusConnect
               font-size: 14px;
             "
           >
-            ${application.opportunityId.company}
+            ${safeCompany}
           </p>
 
           <strong
@@ -746,7 +952,8 @@ CampusConnect
 `.trim(),
           });
         } catch (emailError) {
-          // Do not undo the application status if email fails.
+          // Do not undo the application
+          // status if email fails.
           console.error(
             "Application status email failed:",
             emailError.message
@@ -754,7 +961,7 @@ CampusConnect
         }
       }
 
-      res.json({
+      return res.json({
         success: true,
         message:
           `Application ${status.toLowerCase()} successfully.`,
@@ -766,7 +973,7 @@ CampusConnect
         error.message
       );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message:
           "Failed to update application status.",
@@ -774,7 +981,6 @@ CampusConnect
     }
   }
 );
-
 
 // =====================================================
 // GET MY APPLICATIONS
@@ -799,7 +1005,7 @@ router.get(
             createdAt: -1,
           });
 
-      res.json({
+      return res.json({
         success: true,
         count: applications.length,
         data: applications,
@@ -810,7 +1016,7 @@ router.get(
         error.message
       );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message:
           "Failed to fetch your applications.",
@@ -818,7 +1024,6 @@ router.get(
     }
   }
 );
-
 
 // =====================================================
 // GET ALL APPLICATIONS
@@ -845,7 +1050,7 @@ router.get(
             createdAt: -1,
           });
 
-      res.json({
+      return res.json({
         success: true,
         count: applications.length,
         data: applications,
@@ -856,7 +1061,7 @@ router.get(
         error.message
       );
 
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message:
           "Failed to fetch applications.",
@@ -865,6 +1070,4 @@ router.get(
   }
 );
 
-
 module.exports = router;
-
