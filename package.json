@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "test:coverage": "c8 --reporter=text --reporter=html node --test"
   },
   "keywords": [],
   "author": "",
@@ -29,6 +30,7 @@
     "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
+    "c8": "^12.0.0",
     "nodemon": "^3.1.14"
   }
 }
