@@ -1,8 +1,10 @@
 ﻿# CampusConnect Backend 🚀
 
-The CampusConnect backend is a RESTful API built with Node.js and Express that powers authentication, student profiles, opportunities, applications, notifications, role-based access control, password reset, cloud image storage, and transactional email.
+The CampusConnect backend is a secure RESTful API built with **Node.js and Express.js** that powers the CampusConnect student opportunity platform.
 
-It serves the React frontend deployed on Vercel and uses MongoDB Atlas for persistent data storage.
+It provides authentication, student profiles, opportunities, applications, notifications, saved opportunities, recruiter functionality, administration, role-based access control, password reset, cloud image storage, transactional email, API documentation, and security controls.
+
+The backend is deployed on **Render**, uses **MongoDB Atlas** for persistent data storage, **Cloudinary** for profile image storage, and **Brevo** for transactional email delivery.
 
 ## 🌐 Production
 
@@ -14,9 +16,17 @@ https://campusconnect-server-lcj4.onrender.com
 
 https://campusconnect-red-alpha.vercel.app
 
+**API Documentation**
+
+https://campusconnect-server-lcj4.onrender.com/api-docs
+
+**Health Check**
+
+https://campusconnect-server-lcj4.onrender.com/api/health
+
 ## ✨ Core Features
 
-### Authentication
+### 🔐 Authentication
 
 * User registration
 * Secure login
@@ -25,13 +35,17 @@ https://campusconnect-red-alpha.vercel.app
 * Role-based authorization
 * Account activation/deactivation
 * Password reset
-* One-time password reset tokens
+* Cryptographically secure reset tokens
+* Hashed password reset tokens
 * 15-minute password reset expiry
+* One-time password reset tokens
+* Protected authenticated user information
+* Generic forgot-password responses to reduce account enumeration
 
-### Student Management
+### 👨‍🎓 Student Management
 
 * Student profiles
-* Education
+* Education information
 * Department
 * Location
 * Skills
@@ -39,8 +53,10 @@ https://campusconnect-red-alpha.vercel.app
 * Profile images
 * Cloudinary image storage
 * Student directory
+* Student profile access
+* Profile ownership protection
 
-### Opportunities
+### 💼 Opportunities
 
 * Create opportunities
 * View opportunities
@@ -50,22 +66,26 @@ https://campusconnect-red-alpha.vercel.app
 * Recruiter ownership protection
 * Opportunity categories
 * Opportunity types
-* Remote, on-site and hybrid modes
+* Remote, on-site, and hybrid modes
 * Skills associated with opportunities
+* Opportunity validation
 
-### Applications
+### 📝 Applications
 
 * Submit applications
 * Prevent duplicate applications
 * View personal applications
 * Recruiter application management
+* Application ownership protection
 * Accept applications
 * Reject applications
+* Application status management
 * Application status notifications
 * Recruiter email notifications
 * Student status email notifications
+* Protection against invalid status transitions
 
-### Notifications
+### 🔔 Notifications
 
 * Create system notifications internally
 * View personal notifications
@@ -73,31 +93,54 @@ https://campusconnect-red-alpha.vercel.app
 * Mark individual notifications as read
 * Mark all notifications as read
 * Delete personal notifications
+* Notification ownership protection
 
-### Administration
+### 💾 Saved Opportunities
+
+* Save opportunities
+* Unsave opportunities
+* View saved opportunities
+* Prevent invalid saved-opportunity operations
+* User ownership protection
+
+### 💼 Recruiter Management
+
+* Recruiter dashboard
+* View recruiter-owned opportunities
+* View applications for owned opportunities
+* Applicant information access
+* Application status management
+* Recruiter authorization
+
+### 🛡️ Administration
 
 * Admin dashboard
+* Platform statistics
 * User management
+* Individual user details
 * Role management
 * Account activation/deactivation
 * Application management
-* Platform statistics
 * Protected administrator endpoints
 
 ## 🛡️ Security
 
-The backend includes multiple security layers:
+Security is a major part of the CampusConnect backend architecture.
+
+The backend includes multiple layers of protection:
 
 * JWT authentication
 * Role-based authorization
 * Recruiter ownership verification
 * Application ownership verification
 * Notification ownership verification
+* Saved-opportunity ownership protection
 * Secure password hashing with bcrypt
-* Password reset tokens generated with cryptographically secure random bytes
-* Password reset token hashing
+* Cryptographically secure password reset tokens
+* SHA-256 password reset token hashing
 * Password reset expiration
-* Generic forgot-password responses to reduce account enumeration
+* One-time password reset tokens
+* Generic forgot-password responses
 * Helmet security headers
 * Restricted CORS
 * General API rate limiting
@@ -106,12 +149,14 @@ The backend includes multiple security layers:
 * JSON request-size limits
 * Request input validation
 * Mongoose schema validation
-* Duplicate application protection
 * ObjectId validation
+* Duplicate application protection
 * Profile image size validation
 * Profile image MIME validation
 * Profile image file-signature validation
 * Environment-based secrets
+* Cloudinary secure image storage
+* Production security headers
 
 ## 🧰 Tech Stack
 
@@ -129,6 +174,9 @@ The backend includes multiple security layers:
 * Brevo Transactional Email
 * Helmet
 * Express Rate Limit
+* Swagger/OpenAPI
+* Node.js built-in test runner
+* c8 coverage
 
 ### Infrastructure
 
@@ -141,22 +189,23 @@ The backend includes multiple security layers:
 
 ```text
                          CampusConnect Frontend
-                                  │
-                                  │ HTTPS / REST API
-                                  ▼
-                       ┌─────────────────────┐
-                       │   Express Backend   │
-                       │       Render        │
-                       └─────────┬───────────┘
-                                 │
-              ┌──────────────────┼──────────────────┐
-              │                  │                  │
-              ▼                  ▼                  ▼
-      ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
-      │ MongoDB Atlas│   │  Cloudinary  │   │    Brevo     │
-      │   Database   │   │ Profile      │   │ Transactional│
-      │              │   │ Images       │   │    Email     │
-      └──────────────┘   └──────────────┘   └──────────────┘
+                              Vercel
+                                │
+                                │ HTTPS / REST API
+                                ▼
+                     ┌─────────────────────┐
+                     │   Express Backend   │
+                     │       Render        │
+                     └──────────┬──────────┘
+                                │
+              ┌─────────────────┼─────────────────┐
+              │                 │                 │
+              ▼                 ▼                 ▼
+      ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
+      │ MongoDB Atlas │ │   Cloudinary  │ │     Brevo     │
+      │   Database    │ │ Profile Images│ │ Transactional  │
+      │               │ │               │ │     Email     │
+      └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
 ## 📁 Project Structure
@@ -201,6 +250,8 @@ campusconnect-server/
 
 ## 🔐 Authentication Flow
 
+CampusConnect uses JWT-based authentication.
+
 ```text
 Client
   ↓
@@ -208,7 +259,7 @@ POST /api/auth/login
   ↓
 Validate email + password
   ↓
-bcrypt password comparison
+Compare password with bcrypt
   ↓
 Generate JWT
   ↓
@@ -217,16 +268,20 @@ Return token
 Client sends:
 Authorization: Bearer <token>
   ↓
-protect middleware
+Authentication middleware
   ↓
-Verify token
+Verify JWT
   ↓
-Attach userId + role to request
+Attach user ID + role
+  ↓
+Access protected resource
 ```
+
+The JWT contains the authenticated user's identity and role information used by protected routes.
 
 ## 👥 Role-Based Authorization
 
-CampusConnect supports three roles:
+CampusConnect supports three primary roles:
 
 ```text
 student
@@ -234,16 +289,16 @@ recruiter
 admin
 ```
 
-The authorization flow is:
+Authorization follows this structure:
 
 ```text
 JWT
  ↓
-protect middleware
+Authentication middleware
  ↓
 Identify authenticated user
  ↓
-authorizeRoles middleware
+Role authorization middleware
  ↓
 Check required role
  ↓
@@ -270,6 +325,7 @@ Recruiters can:
 * Delete their own opportunities
 * View applications for their opportunities
 * Accept or reject applications
+* Manage recruiter-specific resources
 
 ### Admin
 
@@ -279,46 +335,51 @@ Administrators can:
 * Change user roles
 * Activate/deactivate accounts
 * View platform statistics
-* View all applications
+* View applications
 * Manage platform-level resources
 
 ## 🔑 Password Reset
 
-The password-reset system uses a secure token workflow:
+The password reset system uses a secure token workflow.
 
 ```text
-Forgot password request
+Forgot Password Request
         ↓
-Find user
+Find User
         ↓
-Generate random reset token
+Generate Cryptographically Secure Token
         ↓
-Hash token with SHA-256
+Hash Token With SHA-256
         ↓
-Store token hash + expiry
+Store Token Hash + Expiry
         ↓
-Send reset link with Brevo
+Send Reset Link Through Brevo
         ↓
-User opens reset link
+User Opens Reset Link
         ↓
-Backend hashes submitted token
+Backend Hashes Submitted Token
         ↓
-Compare with stored hash
+Compare Token Hashes
         ↓
-Check expiration
+Check Expiration
         ↓
-Hash new password
+Hash New Password With bcrypt
         ↓
-Clear reset token
+Clear Reset Token
         ↓
-Password successfully changed
+Password Successfully Changed
 ```
 
-Reset tokens expire after 15 minutes and are invalidated after successful use.
+Reset tokens:
+
+* Expire after 15 minutes
+* Are stored as hashes rather than plaintext
+* Are invalidated after successful use
+* Are generated using cryptographically secure random bytes
 
 ## 📧 Transactional Email
 
-CampusConnect uses **Brevo's transactional email API** rather than SMTP.
+CampusConnect uses the **Brevo transactional email API** instead of SMTP.
 
 Emails include:
 
@@ -327,77 +388,23 @@ Emails include:
 * Application acceptance notifications
 * Application rejection notifications
 
-The API-based email architecture avoids dependency on outbound SMTP ports from the hosting environment.
+Using the Brevo API avoids relying on outbound SMTP connectivity from the production hosting environment.
 
 ## 🖼️ Image Upload Security
 
-Profile images are processed using Multer and Cloudinary.
+Profile images are processed using **Multer** and **Cloudinary**.
 
 The backend:
 
 1. Limits uploads to 2 MB
-2. Accepts JPG, PNG and WebP
-3. Checks the client-provided MIME type
-4. Verifies the actual file signature
+2. Accepts JPG, PNG, and WebP
+3. Validates the client-provided MIME type
+4. Checks the actual file signature
 5. Uploads validated images to Cloudinary
 6. Stores the secure Cloudinary URL
 7. Removes the previous Cloudinary image after successful replacement
 
-## 🔒 Environment Variables
-
-Never commit real environment variables or API keys to GitHub.
-
-Example backend configuration:
-
-```env
-PORT=5000
-NODE_ENV=development
-
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-
-FRONTEND_URL=http://localhost:5173
-FRONTEND_APP_URL=http://localhost:5173
-
-BREVO_API_KEY=your_brevo_api_key
-BREVO_FROM_EMAIL=your_verified_sender_email
-BREVO_FROM_NAME=CampusConnect
-
-CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
-CLOUDINARY_API_KEY=your_cloudinary_api_key
-CLOUDINARY_API_SECRET=your_cloudinary_api_secret
-```
-
-For production, secrets are configured through Render environment variables.
-
-## 🚀 Local Development
-
-Clone the repository:
-
-```bash
-git clone https://github.com/Abdulsalam-k/campusconnect-server.git
-cd campusconnect-server
-```
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Create a `.env` file with the required environment variables.
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-The API runs locally at:
-
-```text
-http://localhost:5000
-```
+This prevents relying solely on the MIME type supplied by the client.
 
 ## 📡 API Overview
 
@@ -472,33 +479,148 @@ PUT /api/admin/users/:id/status
 GET /api/health
 ```
 
-## 🧪 Testing & Security Validation
+## 📚 Swagger / OpenAPI Documentation
 
-The backend has been tested across major application flows including:
+CampusConnect provides interactive API documentation using **Swagger/OpenAPI**.
 
+Production documentation:
+
+https://campusconnect-server-lcj4.onrender.com/api-docs
+
+The documentation includes the major API resources and protected endpoints.
+
+JWT-protected endpoints use Bearer authentication.
+
+The API documentation makes it easier to understand, test, and integrate with the CampusConnect backend.
+
+## 🧪 Automated Testing
+
+The backend has a dedicated automated test suite using the Node.js test runner and c8 for coverage reporting.
+
+### Current Results
+
+**61 automated tests passing**
+
+**100% statement coverage**
+
+**100% branch coverage**
+
+**100% function coverage**
+
+**100% line coverage**
+
+Testing covers major backend functionality including:
+
+* Authentication
 * Registration
 * Login
-* Logout/session restoration
 * Password reset
-* Profile updates
-* Profile image upload
+* Profile management
+* Profile image handling
 * Opportunity creation
 * Opportunity editing
 * Opportunity deletion
 * Application submission
-* Duplicate application prevention
+* Duplicate application protection
 * Application status updates
-* Saved opportunities
 * Notifications
+* Saved opportunities
 * Recruiter authorization
 * Admin authorization
-* Production CORS
-* Production API communication
-* Transactional email delivery
+* Ownership protection
+* Security behavior
+* Production configuration
 
-Security hardening was tested locally before being deployed to production.
+Run the backend tests with:
 
-## 📊 Production Architecture
+```bash
+npm test
+```
+
+Generate the coverage report with:
+
+```bash
+npm run test:coverage
+```
+
+## 🔒 Environment Variables
+
+Never commit real environment variables, credentials, API keys, or secrets to GitHub.
+
+Example configuration:
+
+```env
+PORT=5000
+NODE_ENV=development
+
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_jwt_secret
+
+FRONTEND_URL=http://localhost:5173
+FRONTEND_APP_URL=http://localhost:5173
+
+BREVO_API_KEY=your_brevo_api_key
+BREVO_FROM_EMAIL=your_verified_sender_email
+BREVO_FROM_NAME=CampusConnect
+
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+```
+
+Production secrets are configured through Render environment variables.
+
+## 🚀 Local Development
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Abdulsalam-k/campusconnect-server.git
+```
+
+Enter the project directory:
+
+```bash
+cd campusconnect-server
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env` file using `.env.example` as a guide.
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The API runs locally at:
+
+```text
+http://localhost:5000
+```
+
+Health check:
+
+```text
+http://localhost:5000/api/health
+```
+
+Swagger documentation:
+
+```text
+http://localhost:5000/api-docs
+```
+
+## 🌍 Production Deployment
+
+The backend is deployed on **Render**.
+
+Production architecture:
 
 ```text
 Vercel
@@ -507,7 +629,7 @@ React Frontend
       │ HTTPS
       ▼
 Render
-Express API
+Express REST API
       │
       ├──────────────► MongoDB Atlas
       │
@@ -516,38 +638,71 @@ Express API
       └──────────────► Brevo
 ```
 
+### Production Services
+
+| Service       | Purpose               |
+| ------------- | --------------------- |
+| Render        | Express API hosting   |
+| MongoDB Atlas | Database              |
+| Cloudinary    | Profile image storage |
+| Brevo         | Transactional email   |
+| Vercel        | React frontend        |
+
+The production backend communicates with the deployed React frontend over HTTPS.
+
+## 🛡️ Production Hardening
+
+The production backend includes additional hardening measures such as:
+
+* Restricted production CORS
+* Helmet security headers
+* HSTS in production
+* API rate limiting
+* Authentication rate limiting
+* Registration rate limiting
+* Request body size limits
+* Environment-based secrets
+* API 404 handling
+* Global error handling
+* Production frontend origin validation
+* Protected role-based routes
+
 ## 🎯 Purpose
 
-CampusConnect was designed as a realistic full-stack platform demonstrating:
+CampusConnect was built as a realistic full-stack platform to demonstrate practical backend and software engineering skills.
+
+The backend demonstrates:
 
 * REST API development
-* Backend architecture
+* Express.js architecture
 * Database modeling
 * Authentication
 * Authorization
 * Role-based access control
-* Cloud storage
+* Secure password management
+* Password reset security
+* File upload security
+* Cloud image storage
 * Transactional email
+* API documentation
+* Automated testing
 * Security hardening
-* API design
 * Production deployment
 
 ## 🔮 Future Improvements
 
 Potential future improvements include:
 
-* Automated unit and integration tests
-* End-to-end testing
-* API documentation with Swagger/OpenAPI
-* CI/CD pipeline
-* Advanced search and filtering
-* Pagination improvements
-* Resume/document upload
+* Centralized production logging
+* Advanced application analytics
+* Advanced recommendation systems
 * Recruiter company profiles
-* Analytics
-* Recommendation systems
-* Centralized application logging
+* Resume and document management
+* More advanced search capabilities
 * Production monitoring
+* CI/CD automation
+* End-to-end testing
+* Performance monitoring
 
 ## 👨‍💻 Author
 
@@ -557,12 +712,24 @@ GitHub:
 
 https://github.com/Abdulsalam-k
 
-## 📄 Related Repository
+## 🔗 Related Repositories
 
-Frontend:
+### Frontend
 
 https://github.com/Abdulsalam-k/campusconnect
 
-Live application:
+### Backend
+
+https://github.com/Abdulsalam-k/campusconnect-server
+
+### Live Application
 
 https://campusconnect-red-alpha.vercel.app
+
+### API Documentation
+
+https://campusconnect-server-lcj4.onrender.com/api-docs
+
+---
+
+CampusConnect was developed as a full-stack portfolio project focused on building a realistic student opportunity platform from backend architecture and database design through authentication, security, cloud services, automated testing, API documentation, and production deployment.
