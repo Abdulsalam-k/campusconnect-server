@@ -1,10 +1,12 @@
 const express = require("express");
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const multer = require("multer");
 
 const User = require("../models/User");
+
 const protect = require("../middleware/authMiddleware");
 
 const {
@@ -14,7 +16,6 @@ const {
 const cloudinary = require("../utils/cloudinary");
 
 const router = express.Router();
-
 
 // =====================================================
 // MULTER MEMORY STORAGE
@@ -46,6 +47,51 @@ const uploadProfileImage = multer({
   },
 });
 
+// =====================================================
+// IMAGE SIGNATURE VALIDATION
+// =====================================================
+
+function getRealImageType(buffer) {
+  if (!Buffer.isBuffer(buffer)) {
+    return null;
+  }
+
+  // JPEG
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  // PNG
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+
+  // WebP
+  if (
+    buffer.length >= 12 &&
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+}
 
 // =====================================================
 // CLOUDINARY HELPERS
@@ -72,13 +118,11 @@ function uploadImageToCloudinary(fileBuffer) {
   });
 }
 
-
 function getCloudinaryPublicId(imageUrl) {
   try {
     const url = new URL(imageUrl);
 
-    const uploadMarker =
-      "/image/upload/";
+    const uploadMarker = "/image/upload/";
 
     const uploadIndex =
       url.pathname.indexOf(uploadMarker);
@@ -122,7 +166,6 @@ function getCloudinaryPublicId(imageUrl) {
   }
 }
 
-
 async function deleteCloudinaryImage(imageUrl) {
   if (
     !imageUrl ||
@@ -134,9 +177,7 @@ async function deleteCloudinaryImage(imageUrl) {
   }
 
   const publicId =
-    getCloudinaryPublicId(
-      imageUrl
-    );
+    getCloudinaryPublicId(imageUrl);
 
   if (!publicId) {
     return;
@@ -157,7 +198,6 @@ async function deleteCloudinaryImage(imageUrl) {
     );
   }
 }
-
 
 // =====================================================
 // REGISTER
@@ -259,7 +299,6 @@ router.post(
     }
   }
 );
-
 
 // =====================================================
 // LOGIN
@@ -382,7 +421,6 @@ router.post(
   }
 );
 
-
 // =====================================================
 // FORGOT PASSWORD
 // =====================================================
@@ -447,13 +485,13 @@ router.post(
         resetExpires;
 
       await user.save();
+
       const frontendUrl =
-             process.env.FRONTEND_APP_URL ||
-            "http://localhost:5173";
+        process.env.FRONTEND_APP_URL ||
+        "http://localhost:5173";
 
-        const resetLink =
-          `${frontendUrl.replace(/\/+$/, "")}/reset-password/${resetToken}`;
-
+      const resetLink =
+        `${frontendUrl.replace(/\/+$/, "")}/reset-password/${resetToken}`;
 
       try {
         await sendPasswordResetEmail({
@@ -502,7 +540,6 @@ router.post(
   }
 );
 
-
 // =====================================================
 // RESET PASSWORD
 // =====================================================
@@ -538,9 +575,7 @@ router.post(
         });
       }
 
-      if (
-        password.length < 6
-      ) {
+      if (password.length < 6) {
         return res.status(400).json({
           success: false,
           message:
@@ -620,7 +655,6 @@ router.post(
   }
 );
 
-
 // =====================================================
 // GET CURRENT USER
 // =====================================================
@@ -662,7 +696,6 @@ router.get(
   }
 );
 
-
 // =====================================================
 // UPDATE PROFILE + PROFILE IMAGE
 // =====================================================
@@ -701,7 +734,6 @@ router.put(
         });
       }
 
-
       // ==========================================
       // FIND USER
       // ==========================================
@@ -719,14 +751,12 @@ router.put(
         });
       }
 
-
       // ==========================================
       // SAVE OLD IMAGE URL
       // ==========================================
 
       const oldProfileImage =
         user.profileImage || "";
-
 
       // ==========================================
       // UPDATE TEXT DATA
@@ -747,7 +777,6 @@ router.put(
       user.bio =
         bio?.trim() || "";
 
-
       // ==========================================
       // UPDATE SKILLS
       // ==========================================
@@ -766,12 +795,32 @@ router.put(
             .filter(Boolean);
       }
 
-
       // ==========================================
-      // UPLOAD NEW PROFILE IMAGE
+      // VALIDATE ACTUAL IMAGE FILE
       // ==========================================
 
       if (req.file) {
+        const realImageType =
+          getRealImageType(
+            req.file.buffer
+          );
+
+        if (
+          !realImageType ||
+          realImageType !==
+            req.file.mimetype
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid image file. Please upload a valid JPG, PNG or WebP image.",
+          });
+        }
+
+        // ==========================================
+        // UPLOAD NEW PROFILE IMAGE
+        // ==========================================
+
         const uploadResult =
           await uploadImageToCloudinary(
             req.file.buffer
@@ -793,13 +842,11 @@ router.put(
           uploadResult.secure_url;
       }
 
-
       // ==========================================
       // SAVE USER TO MONGODB
       // ==========================================
 
       await user.save();
-
 
       // ==========================================
       // DELETE OLD CLOUDINARY IMAGE
@@ -817,7 +864,6 @@ router.put(
           oldProfileImage
         );
       }
-
 
       // ==========================================
       // RESPONSE
@@ -842,12 +888,10 @@ router.put(
 
       return res.json({
         success: true,
-
         message:
           req.file
             ? "Profile and profile image updated successfully."
             : "Profile updated successfully.",
-
         data: userResponse,
       });
     } catch (error) {
@@ -890,7 +934,6 @@ router.put(
   }
 );
 
-
 // =====================================================
 // REMOVE PROFILE IMAGE
 // =====================================================
@@ -917,7 +960,6 @@ router.delete(
         });
       }
 
-
       // ==========================================
       // CHECK CURRENT IMAGE
       // ==========================================
@@ -933,7 +975,6 @@ router.delete(
         });
       }
 
-
       // ==========================================
       // DELETE CLOUDINARY IMAGE
       // ==========================================
@@ -948,7 +989,6 @@ router.delete(
         );
       }
 
-
       // ==========================================
       // REMOVE IMAGE FROM DATABASE
       // ==========================================
@@ -956,7 +996,6 @@ router.delete(
       user.profileImage = "";
 
       await user.save();
-
 
       // ==========================================
       // RESPONSE
@@ -984,7 +1023,6 @@ router.delete(
     }
   }
 );
-
 
 // =====================================================
 // MULTER / UPLOAD ERROR HANDLER
@@ -1038,6 +1076,5 @@ router.use(
     });
   }
 );
-
 
 module.exports = router;
