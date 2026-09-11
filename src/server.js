@@ -1,17 +1,31 @@
 const express = require("express");
+
 const cors = require("cors");
+
 const helmet = require("helmet");
+
 const rateLimit = require("express-rate-limit");
+
+const swaggerUi = require("swagger-ui-express");
+
+const swaggerSpec = require("./config/swagger");
 
 require("dotenv").config();
 
 const opportunityRoutes = require("./routes/opportunityRoutes");
+
 const studentRoutes = require("./routes/studentRoutes");
+
 const applicationRoutes = require("./routes/applicationRoutes");
+
 const authRoutes = require("./routes/authRoutes");
+
 const savedOpportunityRoutes = require("./routes/savedOpportunityRoutes");
+
 const notificationRoutes = require("./routes/notificationRoutes");
+
 const recruiterRoutes = require("./routes/recruiterRoutes");
+
 const adminRoutes = require("./routes/adminRoutes");
 
 const connectDB = require("./config/db");
@@ -42,6 +56,7 @@ if (isProduction) {
 app.use(
   helmet({
     strictTransportSecurity: isProduction,
+
     crossOriginResourcePolicy: {
       policy: "cross-origin",
     },
@@ -135,8 +150,11 @@ app.use(
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+
   limit: 300,
+
   standardHeaders: "draft-8",
+
   legacyHeaders: false,
 
   message: {
@@ -154,8 +172,11 @@ app.use("/api", apiLimiter);
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+
   limit: 20,
+
   standardHeaders: "draft-8",
+
   legacyHeaders: false,
 
   message: {
@@ -171,8 +192,11 @@ const authLimiter = rateLimit({
 
 const registrationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
+
   limit: 10,
+
   standardHeaders: "draft-8",
+
   legacyHeaders: false,
 
   message: {
@@ -200,6 +224,16 @@ app.use(
 app.use(
   "/api/auth/reset-password",
   authLimiter
+);
+
+// =====================================================
+// SWAGGER API DOCUMENTATION
+// =====================================================
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
 );
 
 // =====================================================
@@ -316,5 +350,9 @@ connectDB();
 app.listen(PORT, () => {
   console.log(
     `CampusConnect API running on http://localhost:${PORT}`
+  );
+
+  console.log(
+    `Swagger documentation available at http://localhost:${PORT}/api-docs`
   );
 });

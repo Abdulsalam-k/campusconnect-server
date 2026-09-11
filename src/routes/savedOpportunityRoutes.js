@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 
 const User = require("../models/User");
 const Opportunity = require("../models/Opportunity");
@@ -12,6 +13,38 @@ const router = express.Router();
 // SAVE OPPORTUNITY - STUDENT ONLY
 // ==========================================
 
+/**
+ * @swagger
+ * /api/saved-opportunities/{opportunityId}:
+ *   post:
+ *     summary: Save an opportunity
+ *     description: Saves an opportunity to the authenticated student's saved opportunities.
+ *     tags:
+ *       - Saved Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: opportunityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the opportunity
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       201:
+ *         description: Opportunity saved successfully
+ *       404:
+ *         description: Opportunity or user not found
+ *       409:
+ *         description: Opportunity is already saved
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only students can save opportunities
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/:opportunityId",
   protect,
@@ -21,9 +54,10 @@ router.post(
       const { opportunityId } = req.params;
 
       // Check that the opportunity exists
-      const opportunity = await Opportunity.findById(
-        opportunityId
-      );
+      const opportunity =
+        await Opportunity.findById(
+          opportunityId
+        );
 
       if (!opportunity) {
         return res.status(404).json({
@@ -33,9 +67,10 @@ router.post(
       }
 
       // Find logged-in student
-      const user = await User.findById(
-        req.user.userId
-      );
+      const user =
+        await User.findById(
+          req.user.userId
+        );
 
       if (!user) {
         return res.status(404).json({
@@ -48,7 +83,8 @@ router.post(
       const alreadySaved =
         user.savedOpportunities.some(
           (id) =>
-            id.toString() === opportunityId
+            id.toString() ===
+            opportunityId
         );
 
       if (alreadySaved) {
@@ -71,7 +107,8 @@ router.post(
         message:
           "Opportunity saved successfully.",
         data: {
-          opportunityId: opportunity._id,
+          opportunityId:
+            opportunity._id,
         },
       });
     } catch (error) {
@@ -93,17 +130,49 @@ router.post(
 // UNSAVE OPPORTUNITY - STUDENT ONLY
 // ==========================================
 
+/**
+ * @swagger
+ * /api/saved-opportunities/{opportunityId}:
+ *   delete:
+ *     summary: Remove a saved opportunity
+ *     description: Removes an opportunity from the authenticated student's saved opportunities.
+ *     tags:
+ *       - Saved Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: opportunityId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the opportunity
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: Opportunity removed from saved items
+ *       404:
+ *         description: User not found or opportunity is not saved
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only students can remove saved opportunities
+ *       500:
+ *         description: Server error
+ */
 router.delete(
   "/:opportunityId",
   protect,
   authorizeRoles("student"),
   async (req, res) => {
     try {
-      const { opportunityId } = req.params;
+      const { opportunityId } =
+        req.params;
 
-      const user = await User.findById(
-        req.user.userId
-      );
+      const user =
+        await User.findById(
+          req.user.userId
+        );
 
       if (!user) {
         return res.status(404).json({
@@ -115,7 +184,8 @@ router.delete(
       const wasSaved =
         user.savedOpportunities.some(
           (id) =>
-            id.toString() === opportunityId
+            id.toString() ===
+            opportunityId
         );
 
       if (!wasSaved) {
@@ -130,7 +200,8 @@ router.delete(
       user.savedOpportunities =
         user.savedOpportunities.filter(
           (id) =>
-            id.toString() !== opportunityId
+            id.toString() !==
+            opportunityId
         );
 
       await user.save();
@@ -159,15 +230,40 @@ router.delete(
 // GET SAVED OPPORTUNITIES - STUDENT ONLY
 // ==========================================
 
+/**
+ * @swagger
+ * /api/saved-opportunities:
+ *   get:
+ *     summary: Get saved opportunities
+ *     description: Returns all opportunities saved by the authenticated student.
+ *     tags:
+ *       - Saved Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Saved opportunities fetched successfully
+ *       404:
+ *         description: User not found
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only students can access saved opportunities
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/",
   protect,
   authorizeRoles("student"),
   async (req, res) => {
     try {
-      const user = await User.findById(
-        req.user.userId
-      ).populate("savedOpportunities");
+      const user =
+        await User.findById(
+          req.user.userId
+        ).populate(
+          "savedOpportunities"
+        );
 
       if (!user) {
         return res.status(404).json({
@@ -178,8 +274,10 @@ router.get(
 
       res.json({
         success: true,
-        count: user.savedOpportunities.length,
-        data: user.savedOpportunities,
+        count:
+          user.savedOpportunities.length,
+        data:
+          user.savedOpportunities,
       });
     } catch (error) {
       console.error(

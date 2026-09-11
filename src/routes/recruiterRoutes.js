@@ -12,6 +12,26 @@ const router = express.Router();
 // RECRUITER DASHBOARD
 // ==========================================
 
+/**
+ * @swagger
+ * /api/recruiter/dashboard:
+ *   get:
+ *     summary: Get recruiter dashboard
+ *     description: Returns the authenticated recruiter's opportunities, applications, and application statistics. Administrators may also access this endpoint.
+ *     tags:
+ *       - Recruiter
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Recruiter dashboard fetched successfully
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to access the recruiter dashboard
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/dashboard",
   protect,
@@ -109,6 +129,36 @@ router.get(
 // RECRUITER / ADMIN
 // ==========================================
 
+/**
+ * @swagger
+ * /api/recruiter/applications/{id}:
+ *   get:
+ *     summary: Get a single application
+ *     description: Returns an application for one of the recruiter's own opportunities. Administrators can view any application.
+ *     tags:
+ *       - Recruiter
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the application
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: Application details fetched successfully
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to view this application
+ *       404:
+ *         description: Application or associated opportunity not found
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/applications/:id",
   protect,
@@ -160,7 +210,10 @@ router.get(
         opportunity.createdBy.toString() ===
           req.user.userId.toString();
 
-      if (!isAdmin && !isOpportunityOwner) {
+      if (
+        !isAdmin &&
+        !isOpportunityOwner
+      ) {
         return res.status(403).json({
           success: false,
           message:

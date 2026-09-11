@@ -1,12 +1,17 @@
 const express = require("express");
+
 const mongoose = require("mongoose");
 
 const Application = require("../models/Application");
+
 const Opportunity = require("../models/Opportunity");
+
 const Notification = require("../models/Notification");
+
 const User = require("../models/User");
 
 const protect = require("../middleware/authMiddleware");
+
 const authorizeRoles = require("../middleware/roleMiddleware");
 
 const {
@@ -45,6 +50,62 @@ function isValidPhone(phone) {
 // STUDENT ONLY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/applications:
+ *   post:
+ *     summary: Submit an application
+ *     description: Allows an authenticated student to apply for an opportunity.
+ *     tags:
+ *       - Applications
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - opportunityId
+ *               - fullName
+ *               - email
+ *               - phone
+ *               - coverLetter
+ *             properties:
+ *               opportunityId:
+ *                 type: string
+ *                 description: MongoDB ID of the opportunity
+ *                 example: 507f1f77bcf86cd799439011
+ *               fullName:
+ *                 type: string
+ *                 example: Abdulkareem Abdulsalam
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: student@example.com
+ *               phone:
+ *                 type: string
+ *                 example: +2348012345678
+ *               coverLetter:
+ *                 type: string
+ *                 example: I am interested in this opportunity because I have relevant frontend development experience.
+ *     responses:
+ *       201:
+ *         description: Application submitted successfully
+ *       400:
+ *         description: Invalid or missing application data
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only students can submit applications
+ *       404:
+ *         description: Opportunity not found
+ *       409:
+ *         description: Student has already applied for this opportunity
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/",
   protect,
@@ -172,7 +233,8 @@ router.post(
       if (!opportunity) {
         return res.status(404).json({
           success: false,
-          message: "Opportunity not found.",
+          message:
+            "Opportunity not found.",
         });
       }
 
@@ -295,18 +357,23 @@ Hello ${recruiter.name || "Recruiter"},
 You have received a new application on CampusConnect.
 
 Opportunity:
+
 ${opportunity.title}
 
 Company:
+
 ${opportunity.company}
 
 Applicant:
+
 ${normalizedName}
 
 Applicant email:
+
 ${normalizedEmail}
 
 Phone:
+
 ${normalizedPhone}
 
 The applicant has successfully submitted their application.
@@ -533,6 +600,7 @@ CampusConnect
           } catch (emailError) {
             // Email failure must not cancel
             // successful application submission.
+
             console.error(
               "Recruiter application email failed:",
               emailError.message
@@ -576,6 +644,53 @@ CampusConnect
 // RECRUITER / ADMIN
 // =====================================================
 
+/**
+ * @swagger
+ * /api/applications/{id}/status:
+ *   put:
+ *     summary: Update application status
+ *     description: Allows a recruiter to accept or reject an application for their own opportunity. Administrators can manage any application.
+ *     tags:
+ *       - Applications
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the application
+ *         example: 507f1f77bcf86cd799439011
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - status
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum:
+ *                   - Accepted
+ *                   - Rejected
+ *                 example: Accepted
+ *     responses:
+ *       200:
+ *         description: Application status updated successfully
+ *       400:
+ *         description: Invalid application ID, invalid status, or application already processed
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to manage this application
+ *       404:
+ *         description: Application not found
+ *       500:
+ *         description: Server error
+ */
 router.put(
   "/:id/status",
   protect,
@@ -583,7 +698,9 @@ router.put(
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { status } = req.body || {};
+
+      const { status } =
+        req.body || {};
 
       // ==========================================
       // VALIDATE APPLICATION ID
@@ -741,12 +858,15 @@ Hello ${student.name || "Student"},
 Your CampusConnect application has been ${status.toLowerCase()}.
 
 Opportunity:
+
 ${application.opportunityId.title}
 
 Company:
+
 ${application.opportunityId.company}
 
 Status:
+
 ${status}
 
 ${
@@ -818,7 +938,6 @@ CampusConnect
       </div>
 
       <div style="padding: 35px 30px;">
-
         <h1
           style="
             margin: 0 0 14px;
@@ -943,7 +1062,6 @@ CampusConnect
             talent and connections.
           </p>
         </div>
-
       </div>
     </div>
   </div>
@@ -954,6 +1072,7 @@ CampusConnect
         } catch (emailError) {
           // Do not undo the application
           // status if email fails.
+
           console.error(
             "Application status email failed:",
             emailError.message
@@ -987,6 +1106,26 @@ CampusConnect
 // STUDENT
 // =====================================================
 
+/**
+ * @swagger
+ * /api/applications/my:
+ *   get:
+ *     summary: Get the authenticated student's applications
+ *     description: Returns all applications submitted by the currently authenticated student.
+ *     tags:
+ *       - Applications
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Applications fetched successfully
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only students can access their applications
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/my",
   protect,
@@ -1030,6 +1169,26 @@ router.get(
 // ADMIN ONLY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/applications:
+ *   get:
+ *     summary: Get all applications
+ *     description: Returns all applications in the system. This endpoint is restricted to administrators.
+ *     tags:
+ *       - Applications
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Applications fetched successfully
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: Only administrators can access all applications
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/",
   protect,

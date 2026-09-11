@@ -4,11 +4,24 @@ const User = require("../models/User");
 
 const router = express.Router();
 
-
 // =====================================================
 // GET ALL STUDENTS
 // =====================================================
 
+/**
+ * @swagger
+ * /api/students:
+ *   get:
+ *     summary: Get all students
+ *     description: Returns all active student profiles for the CampusConnect directory.
+ *     tags:
+ *       - Students
+ *     responses:
+ *       200:
+ *         description: Students fetched successfully
+ *       500:
+ *         description: Server error
+ */
 router.get("/", async (req, res) => {
   try {
     const students = await User.find({
@@ -53,11 +66,34 @@ router.get("/", async (req, res) => {
   }
 });
 
-
 // =====================================================
 // GET SINGLE STUDENT
 // =====================================================
 
+/**
+ * @swagger
+ * /api/students/{id}:
+ *   get:
+ *     summary: Get a single student
+ *     description: Returns the public profile of one active student by MongoDB ID.
+ *     tags:
+ *       - Students
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the student
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: Student fetched successfully
+ *       404:
+ *         description: Student not found
+ *       500:
+ *         description: Server error
+ */
 router.get("/:id", async (req, res) => {
   try {
     const student =
@@ -110,6 +146,5 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

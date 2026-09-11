@@ -9,11 +9,24 @@ const authorizeRoles = require("../middleware/roleMiddleware");
 
 const router = express.Router();
 
-
 // =====================================================
 // GET ALL OPPORTUNITIES
 // =====================================================
 
+/**
+ * @swagger
+ * /api/opportunities:
+ *   get:
+ *     summary: Get all opportunities
+ *     description: Returns all available opportunities, ordered from newest to oldest.
+ *     tags:
+ *       - Opportunities
+ *     responses:
+ *       200:
+ *         description: Opportunities fetched successfully
+ *       500:
+ *         description: Server error
+ */
 router.get("/", async (req, res) => {
   try {
     const opportunities = await Opportunity.find()
@@ -40,11 +53,36 @@ router.get("/", async (req, res) => {
   }
 });
 
-
 // =====================================================
 // GET SINGLE OPPORTUNITY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/opportunities/{id}:
+ *   get:
+ *     summary: Get a single opportunity
+ *     description: Returns one opportunity by its MongoDB ID.
+ *     tags:
+ *       - Opportunities
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the opportunity
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: Opportunity fetched successfully
+ *       400:
+ *         description: Invalid opportunity ID
+ *       404:
+ *         description: Opportunity not found
+ *       500:
+ *         description: Server error
+ */
 router.get("/:id", async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -87,11 +125,89 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-
 // =====================================================
 // CREATE OPPORTUNITY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/opportunities:
+ *   post:
+ *     summary: Create an opportunity
+ *     description: Creates a new opportunity. Only recruiters and administrators can create opportunities.
+ *     tags:
+ *       - Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - title
+ *               - company
+ *               - description
+ *               - type
+ *               - location
+ *               - mode
+ *               - category
+ *               - deadline
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Frontend Developer Intern
+ *               company:
+ *                 type: string
+ *                 example: CampusConnect Technologies
+ *               description:
+ *                 type: string
+ *                 example: Join our team as a frontend developer intern and work on real-world web applications.
+ *               type:
+ *                 type: string
+ *                 enum:
+ *                   - Internship
+ *                   - Part-time
+ *                   - Full-time
+ *                   - Contract
+ *                 example: Internship
+ *               location:
+ *                 type: string
+ *                 example: Lagos
+ *               mode:
+ *                 type: string
+ *                 enum:
+ *                   - Remote
+ *                   - On-site
+ *                   - Hybrid
+ *                 example: Hybrid
+ *               category:
+ *                 type: string
+ *                 example: Software Development
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example:
+ *                   - JavaScript
+ *                   - React
+ *                   - Git
+ *               deadline:
+ *                 type: string
+ *                 example: 2026-12-31
+ *     responses:
+ *       201:
+ *         description: Opportunity created successfully
+ *       400:
+ *         description: Required opportunity fields are missing
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to create opportunities
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/",
   protect,
@@ -185,11 +301,90 @@ router.post(
   }
 );
 
-
 // =====================================================
 // UPDATE OPPORTUNITY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/opportunities/{id}:
+ *   put:
+ *     summary: Update an opportunity
+ *     description: Updates an existing opportunity. Recruiters can update opportunities they created, while administrators can update any opportunity.
+ *     tags:
+ *       - Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the opportunity
+ *         example: 507f1f77bcf86cd799439011
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: Senior Frontend Developer Intern
+ *               company:
+ *                 type: string
+ *                 example: CampusConnect Technologies
+ *               description:
+ *                 type: string
+ *                 example: Updated opportunity description with additional responsibilities.
+ *               type:
+ *                 type: string
+ *                 enum:
+ *                   - Internship
+ *                   - Part-time
+ *                   - Full-time
+ *                   - Contract
+ *                 example: Internship
+ *               location:
+ *                 type: string
+ *                 example: Lagos
+ *               mode:
+ *                 type: string
+ *                 enum:
+ *                   - Remote
+ *                   - On-site
+ *                   - Hybrid
+ *                 example: Remote
+ *               category:
+ *                 type: string
+ *                 example: Software Development
+ *               skills:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 example:
+ *                   - JavaScript
+ *                   - React
+ *                   - Node.js
+ *               deadline:
+ *                 type: string
+ *                 example: 2027-01-31
+ *     responses:
+ *       200:
+ *         description: Opportunity updated successfully
+ *       400:
+ *         description: Invalid opportunity ID
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to update this opportunity
+ *       404:
+ *         description: Opportunity not found
+ *       500:
+ *         description: Server error
+ */
 router.put(
   "/:id",
   protect,
@@ -346,11 +541,42 @@ router.put(
   }
 );
 
-
 // =====================================================
 // DELETE OPPORTUNITY
 // =====================================================
 
+/**
+ * @swagger
+ * /api/opportunities/{id}:
+ *   delete:
+ *     summary: Delete an opportunity
+ *     description: Deletes an opportunity and all applications associated with it. Recruiters can delete opportunities they created, while administrators can delete any opportunity.
+ *     tags:
+ *       - Opportunities
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ID of the opportunity
+ *         example: 507f1f77bcf86cd799439011
+ *     responses:
+ *       200:
+ *         description: Opportunity and related applications deleted successfully
+ *       400:
+ *         description: Invalid opportunity ID
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       403:
+ *         description: User is not authorized to delete this opportunity
+ *       404:
+ *         description: Opportunity not found
+ *       500:
+ *         description: Server error
+ */
 router.delete(
   "/:id",
   protect,
@@ -445,6 +671,5 @@ router.delete(
     }
   }
 );
-
 
 module.exports = router;

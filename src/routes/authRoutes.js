@@ -1,8 +1,11 @@
 const express = require("express");
 
 const bcrypt = require("bcryptjs");
+
 const jwt = require("jsonwebtoken");
+
 const crypto = require("crypto");
+
 const multer = require("multer");
 
 const User = require("../models/User");
@@ -203,6 +206,47 @@ async function deleteCloudinaryImage(imageUrl) {
 // REGISTER
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new student account
+ *     description: Creates a new CampusConnect user account.
+ *     tags:
+ *       - Authentication
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Abdulkareem Abdulsalam
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: student@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: password123
+ *     responses:
+ *       201:
+ *         description: Account created successfully
+ *       400:
+ *         description: Missing required fields or invalid password
+ *       409:
+ *         description: User already exists
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/register",
   async (req, res) => {
@@ -304,6 +348,44 @@ router.post(
 // LOGIN
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login to CampusConnect
+ *     description: Authenticates a user and returns a JWT token.
+ *     tags:
+ *       - Authentication
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: student@example.com
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: password123
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       400:
+ *         description: Email and password are required
+ *       401:
+ *         description: Invalid email or password
+ *       403:
+ *         description: Account has been deactivated
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/login",
   async (req, res) => {
@@ -425,6 +507,35 @@ router.post(
 // FORGOT PASSWORD
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/forgot-password:
+ *   post:
+ *     summary: Request a password reset
+ *     description: Sends a password reset link when the account exists.
+ *     tags:
+ *       - Authentication
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: student@example.com
+ *     responses:
+ *       200:
+ *         description: Password reset request processed
+ *       400:
+ *         description: Email is required
+ *       500:
+ *         description: Server error or email delivery failure
+ */
 router.post(
   "/forgot-password",
   async (req, res) => {
@@ -544,6 +655,49 @@ router.post(
 // RESET PASSWORD
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/reset-password/{token}:
+ *   post:
+ *     summary: Reset account password
+ *     description: Sets a new password using a valid password reset token.
+ *     tags:
+ *       - Authentication
+ *     parameters:
+ *       - in: path
+ *         name: token
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Password reset token received by email
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - password
+ *               - confirmPassword
+ *             properties:
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: newpassword123
+ *               confirmPassword:
+ *                 type: string
+ *                 format: password
+ *                 minLength: 6
+ *                 example: newpassword123
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ *       400:
+ *         description: Invalid or expired token, missing fields, or password mismatch
+ *       500:
+ *         description: Server error
+ */
 router.post(
   "/reset-password/:token",
   async (req, res) => {
@@ -604,7 +758,6 @@ router.post(
         await User.findOne({
           passwordResetTokenHash:
             tokenHash,
-
           passwordResetExpires: {
             $gt: new Date(),
           },
@@ -659,6 +812,26 @@ router.post(
 // GET CURRENT USER
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Get the currently authenticated user
+ *     description: Returns the profile of the currently authenticated user.
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Current user returned successfully
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.get(
   "/me",
   protect,
@@ -700,6 +873,56 @@ router.get(
 // UPDATE PROFILE + PROFILE IMAGE
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   put:
+ *     summary: Update the authenticated user's profile
+ *     description: Updates profile information and optionally uploads a profile image.
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: Abdulkareem Abdulsalam
+ *               education:
+ *                 type: string
+ *                 example: Federal University of Technology Akure
+ *               department:
+ *                 type: string
+ *                 example: Software Engineering
+ *               location:
+ *                 type: string
+ *                 example: Lagos
+ *               bio:
+ *                 type: string
+ *                 example: Frontend developer interested in building useful products.
+ *               skills:
+ *                 type: string
+ *                 example: JavaScript
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       400:
+ *         description: Invalid profile data or image
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.put(
   "/profile",
   protect,
@@ -938,6 +1161,28 @@ router.put(
 // REMOVE PROFILE IMAGE
 // =====================================================
 
+/**
+ * @swagger
+ * /api/auth/profile-image:
+ *   delete:
+ *     summary: Remove the authenticated user's profile image
+ *     description: Removes the current profile image from the user's account and Cloudinary.
+ *     tags:
+ *       - Authentication
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile image removed successfully
+ *       400:
+ *         description: User does not have a profile photo
+ *       401:
+ *         description: Missing or invalid authentication token
+ *       404:
+ *         description: User not found
+ *       500:
+ *         description: Server error
+ */
 router.delete(
   "/profile-image",
   protect,
